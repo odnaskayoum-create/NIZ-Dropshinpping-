@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>NIZ — Espace associés</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--tx:#14202e;--mu:#667386;--gd:#d4a62a;--bd:#e3e7ee;color-scheme:light dark}
+@media (prefers-color-scheme:dark){:root{--bg:#10151c;--card:#1a212b;--tx:#edf0f5;--mu:#98a3b3;--bd:#2a3340}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.45 system-ui,sans-serif}
+header{background:#000;color:var(--gd);padding:16px;font-weight:800;font-size:18px}
+main{max-width:640px;margin:auto;padding:14px}h2{font-size:18px;margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-bottom:10px}
+.row{display:flex;gap:8px;align-items:center;justify-content:space-between}
+input,select{width:100%;font:inherit;padding:11px;margin-top:8px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx)}
+.btn{display:block;width:100%;font:inherit;font-weight:600;background:#111;color:#fff;border:0;border-radius:10px;padding:12px;margin-top:8px;cursor:pointer}.btn.gold{background:var(--gd);color:#1d1600}
+.pick{display:block;text-align:center;border:2px dashed var(--gd);border-radius:12px;padding:16px;margin-top:8px;cursor:pointer}.pick img{max-width:100%;max-height:150px;border-radius:8px;display:block;margin:0 auto 6px}
+.mu{color:var(--mu);font-size:13px}.chip{border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:20px;padding:6px 12px;cursor:pointer}
+</style></head><body><header>NIZ Dropshipping · Espace associés</header><main id="m"></main>
+<script>
+const $=s=>document.querySelector(s),esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
+let cfg=get("niz_cfg",{}),P=[],sha="",newImg="",dirty=false,busy=false,orders=get("niz_orders",[]);
+const STAT=["Nouvelle","Achetée","En livraison","Livrée"],fmt=n=>n?n.toLocaleString("fr-FR")+" FCFA":"Sur demande";
+const api=(p,o={})=>fetch("https://api.github.com/repos/"+cfg.u+"/"+cfg.r+"/contents/"+p,{...o,headers:{Authorization:"Bearer "+cfg.t,Accept:"application/vnd.github+json","Content-Type":"application/json"}});
+const dec=b=>decodeURIComponent(escape(atob(b.replace(/\s/g,"")))),enc=s=>btoa(unescape(encodeURIComponent(s)));
+function save(){cfg={u:$("#u").value.trim(),r:$("#r").value.trim(),t:$("#t").value.trim()};localStorage.setItem("niz_cfg",JSON.stringify(cfg));load()}
+function reset(){localStorage.removeItem("niz_cfg");cfg={};render()}
+async function load(){
+ try{const r=await api("produits.json");if(!r.ok)throw 0;const j=await r.json();sha=j.sha;P=JSON.parse(dec(j.content));render()}
+ catch(e){alert("Connexion impossible : vérifiez l’identifiant GitHub, le nom du dépôt et le jeton.");reset()}
+}
+function pic(f){return new Promise(r=>{const i=new Image();i.onload=()=>{const k=Math.min(1,640/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);r(c.toDataURL("image/jpeg",.72))};i.src=URL.createObjectURL(f)})}
+async function prev(inp){const f=inp.files[0];if(!f)return;newImg=await pic(f);$("#pv").innerHTML='<img src="'+newImg+'" alt="">Photo prête ✔'}
+function addProd(){const n=$("#pn").value.trim();if(!n){alert("Écrivez le nom du produit.");return}P.push({id:"p"+Date.now(),n,c:$("#pc").value,p:+$("#pp").value||0,img:"",_d:newImg});newImg="";dirty=true;render()}
+function setPrice(i,v){P[i].p=+v||0;dirty=true;render()}
+function del(i){if(confirm("Supprimer ce produit ?")){P.splice(i,1);dirty=true;render()}}
+async function pub(){
+ busy=true;render();
+ try{
+  for(const p of P)if(p._d){const path="images/"+p.id+".jpg",r=await api(path,{method:"PUT",body:JSON.stringify({message:"Photo "+p.n,content:p._d.split(",")[1]})});if(!r.ok)throw 0;p.img=path;delete p._d}
+  const r=await api("produits.json",{method:"PUT",body:JSON.stringify({message:"Mise à jour du catalogue",content:enc(JSON.stringify(P)),sha})});
+  if(!r.ok)throw 0;sha=(await r.json()).content.sha;dirty=false;alert("Publié ✔ Les clients verront les changements dans 1 à 2 minutes.");
+ }catch(e){alert("Échec de la publication. Vérifiez que le jeton a le droit « Contents : Read and write ».")}
+ busy=false;render();
+}
+function so(){localStorage.setItem("niz_orders",JSON.stringify(orders))}
+function addOrder(){const c=$("#mc").value.trim();if(!c)return;orders.unshift({id:Date.now(),client:c,articles:$("#ma").value,total:+$("#mt").value||0,statut:"Nouvelle",paye:false,date:new Date().toISOString().slice(0,10)});so();render()}
+function updO(id,d){orders=orders.map(o=>o.id===id?{...o,...d}:o);so();render()}
+function render(){
+ const m=$("#m");
+ if(!cfg.t){m.innerHTML='<h2>Connexion (une seule fois)</h2><div class="card"><div class="mu">Entrez les informations GitHub de NIZ. Elles restent sur ce téléphone.</div><input id="u" placeholder="Identifiant GitHub"><input id="r" placeholder="Nom du dépôt (ex. niz-dropshipping)"><input id="t" type="password" placeholder="Jeton d’accès GitHub"><button class="btn gold" onclick="save()">Se connecter</button></div>';return}
+ if(!P.length&&!sha){m.innerHTML='<div class="card">Chargement…</div>';load();return}
+ const ca=orders.filter(o=>o.paye).reduce((s,o)=>s+o.total,0);
+ m.innerHTML='<h2>Publier un produit</h2><div class="card"><label class="pick" id="pv">📷 <b>1. Touchez pour choisir la photo</b><input type="file" accept="image/*" hidden onchange="prev(this)"></label><input id="pn" placeholder="2. Nom du produit"><select id="pc"><option>Hommes</option><option>Femmes</option><option>Accessoires</option><option>Autres</option></select><input id="pp" type="number" placeholder="3. Prix en FCFA (vide = sur demande)"><button class="btn" onclick="addProd()">4. Ajouter à la liste</button></div>'+
+ '<h2>Produits ('+P.length+')</h2>'+P.map((p,i)=>'<div class="card row">'+((p._d||p.img)?'<img src="'+(p._d||p.img)+'" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">':"")+'<div style="flex:1"><b>'+esc(p.n)+'</b> <span class="mu">'+esc(p.c)+'</span><input type="number" value="'+p.p+'" onchange="setPrice('+i+',this.value)"></div><button class="chip" onclick="del('+i+')">Suppr.</button></div>').join("")+
+ '<button class="btn gold" onclick="pub()" '+(busy?"disabled":"")+'>'+(busy?"Publication…":"5. Publier les changements"+(dirty?" (en attente)":""))+'</button><div class="mu" style="margin-top:6px">Les clients voient les nouveautés seulement après cette étape.</div>'+
+ '<h2>Suivi des commandes</h2><div class="card"><div class="mu">Enregistré sur cet appareil seulement.</div><div class="row" style="margin-top:6px"><span>'+orders.length+' commande(s)</span><b>Encaissé : '+fmt(ca)+'</b></div><input id="mc" placeholder="Client"><input id="ma" placeholder="Articles"><input id="mt" type="number" placeholder="Montant (FCFA)"><button class="btn" onclick="addOrder()">Enregistrer une commande</button></div>'+
+ orders.map(o=>'<div class="card"><div class="row"><b>'+esc(o.client)+'</b><span class="mu">'+o.date+'</span></div><div>'+esc(o.articles||"")+'</div><div class="row" style="margin-top:6px"><b>'+fmt(o.total)+'</b><select style="width:auto;margin:0" onchange="updO('+o.id+',{statut:this.value})">'+STAT.map(s=>"<option "+(s===o.statut?"selected":"")+">"+s+"</option>").join("")+'</select><label><input type="checkbox" style="width:auto;margin:0" '+(o.paye?"checked":"")+' onchange="updO('+o.id+',{paye:this.checked})"> Payé</label></div></div>').join("")+
+ '<button class="btn" style="background:transparent;color:var(--mu);border:1px solid var(--bd)" onclick="reset()">Changer les réglages de connexion</button>';
+}
+render();
+</script></body></html>
