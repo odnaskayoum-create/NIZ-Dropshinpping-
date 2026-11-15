@@ -16,14 +16,14 @@ input,select{width:100%;font:inherit;padding:11px;margin-top:8px;border:1px soli
 <script>
 const $=s=>document.querySelector(s),esc=t=>String(t).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const get=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))||d}catch(e){return d}};
-let cfg=get("niz_cfg",{}),P=[],sha="",newImg="",dirty=false,busy=false,orders=get("niz_orders",[]);
+let G=[],shaG="",newPhoto="",cfg=get("niz_cfg",{}),P=[],sha="",newImg="",dirty=false,busy=false,orders=get("niz_orders",[]);
 const STAT=["Nouvelle","Achetée","En livraison","Livrée"],fmt=n=>n?n.toLocaleString("fr-FR")+" FCFA":"Sur demande";
 const api=(p,o={})=>fetch("https://api.github.com/repos/"+cfg.u+"/"+cfg.r+"/contents/"+p,{...o,headers:{Authorization:"Bearer "+cfg.t,Accept:"application/vnd.github+json","Content-Type":"application/json"}});
 const dec=b=>decodeURIComponent(escape(atob(b.replace(/\s/g,"")))),enc=s=>btoa(unescape(encodeURIComponent(s)));
 function save(){cfg={u:$("#u").value.trim(),r:$("#r").value.trim(),t:$("#t").value.trim()};localStorage.setItem("niz_cfg",JSON.stringify(cfg));load()}
 function reset(){localStorage.removeItem("niz_cfg");cfg={};render()}
 async function load(){
- try{const r=await api("produits.json");if(!r.ok)throw 0;const j=await r.json();sha=j.sha;P=JSON.parse(dec(j.content));render()}
+ try{const r=await api("produits.json");if(!r.ok)throw 0;const j=await r.json();sha=j.sha;P=JSON.parse(dec(j.content));try{const r2=await api("pubs.json");if(r2.ok){const j2=await r2.json();shaG=j2.sha;G=JSON.parse(dec(j2.content))}}catch(e){}render()}
  catch(e){alert("Connexion impossible : vérifiez l’identifiant GitHub, le nom du dépôt et le jeton.");reset()}
 }
 function pic(f){return new Promise(r=>{const i=new Image();i.onload=()=>{const k=Math.min(1,640/Math.max(i.width,i.height)),c=document.createElement("canvas");c.width=i.width*k;c.height=i.height*k;c.getContext("2d").drawImage(i,0,0,c.width,c.height);r(c.toDataURL("image/jpeg",.72))};i.src=URL.createObjectURL(f)})}
@@ -40,6 +40,21 @@ async function pub(){
  }catch(e){alert("Échec de la publication. Vérifiez que le jeton a le droit « Contents : Read and write ».")}
  busy=false;render();
 }
+async function prevG(i){const f=i.files[0];if(!f)return;newPhoto=await pic(f);$("#gv").innerHTML='<img src="'+newPhoto+'" alt="">Photo prête ✔'}
+function addPhoto(){if(!newPhoto){alert("Choisissez une photo.");return}G.push({id:"g"+Date.now(),type:"photo",titre:$("#gt").value.trim()||"NIZ Dropshipping",img:"",_d:newPhoto});newPhoto="";render()}
+function addVid(){const u=$("#vu").value.trim();if(!/^https?:\/\//.test(u)){alert("Collez un lien qui commence par https://");return}G.push({id:"g"+Date.now(),type:"video",titre:$("#vt").value.trim()||"Vidéo NIZ",url:u});render()}
+function delG(i){if(confirm("Supprimer cet élément ?")){G.splice(i,1);render()}}
+async function pubG(){
+ try{
+  for(const g of G)if(g._d){const path="images/"+g.id+".jpg",r=await api(path,{method:"PUT",body:JSON.stringify({message:"Photo galerie",content:g._d.split(",")[1]})});if(!r.ok)throw 0;g.img=path;delete g._d}
+  const body={message:"Mise à jour de la galerie",content:enc(JSON.stringify(G))};if(shaG)body.sha=shaG;
+  const r=await api("pubs.json",{method:"PUT",body:JSON.stringify(body)});if(!r.ok)throw 0;shaG=(await r.json()).content.sha;alert("Galerie publiée ✔ Visible dans 1 à 2 minutes.");
+ }catch(e){alert("Échec de la publication de la galerie.")}
+ render();
+}
+function vG(){return '<h2>Publicités et photos (page Galerie)</h2><div class="card"><label class="pick" id="gv">📷 <b>Photo : touchez pour choisir</b><input type="file" accept="image/*" hidden onchange="prevG(this)"></label><input id="gt" placeholder="Titre de la photo"><button class="btn" onclick="addPhoto()">Ajouter la photo</button></div><div class="card"><b>Vidéo</b><div class="mu">Collez le lien de la vidéo (YouTube, TikTok, Facebook…).</div><input id="vt" placeholder="Titre de la vidéo"><input id="vu" placeholder="https://..."><button class="btn" onclick="addVid()">Ajouter la vidéo</button></div>'+G.map((g,i)=>'<div class="card row">'+(g.type==="photo"?'<img src="'+(g._d||g.img)+'" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">':'<span style="font-size:32px">🎬</span>')+'<div style="flex:1"><b>'+esc(g.titre)+'</b></div><button class="chip" onclick="delG('+i+')">Suppr.</button></div>').join("")+'<button class="btn gold" onclick="pubG()">Publier la galerie</button>'}
+function vMeet(){const r=localStorage.getItem("niz_room")||"";return '<h2>Réunion des associés</h2><div class="card"><div class="mu">Réunion vidéo gratuite. Les 4 associés tapent le même nom de salle. Gardez-le secret et partagez-le dans votre groupe WhatsApp.</div><input id="rm" value="'+esc(r)+'" placeholder="Nom de la salle (ex. NIZ-Equipe-7392)"><button class="btn gold" onclick="meet()">Démarrer / rejoindre la réunion</button></div>'}
+function meet(){const r=$("#rm").value.trim().replace(/[^A-Za-z0-9-]/g,"");if(r.length<8){alert("Choisissez un nom de salle d’au moins 8 caractères (lettres, chiffres, tirets).");return}localStorage.setItem("niz_room",r);window.open("https://meet.jit.si/"+r,"_blank")}
 function so(){localStorage.setItem("niz_orders",JSON.stringify(orders))}
 function addOrder(){const c=$("#mc").value.trim();if(!c)return;orders.unshift({id:Date.now(),client:c,articles:$("#ma").value,total:+$("#mt").value||0,statut:"Nouvelle",paye:false,date:new Date().toISOString().slice(0,10)});so();render()}
 function updO(id,d){orders=orders.map(o=>o.id===id?{...o,...d}:o);so();render()}
@@ -51,7 +66,7 @@ function render(){
  m.innerHTML='<h2>Publier un produit</h2><div class="card"><label class="pick" id="pv">📷 <b>1. Touchez pour choisir la photo</b><input type="file" accept="image/*" hidden onchange="prev(this)"></label><input id="pn" placeholder="2. Nom du produit"><select id="pc"><option>Hommes</option><option>Femmes</option><option>Accessoires</option><option>Autres</option></select><input id="pp" type="number" placeholder="3. Prix en FCFA (vide = sur demande)"><button class="btn" onclick="addProd()">4. Ajouter à la liste</button></div>'+
  '<h2>Produits ('+P.length+')</h2>'+P.map((p,i)=>'<div class="card row">'+((p._d||p.img)?'<img src="'+(p._d||p.img)+'" alt="" style="width:56px;height:56px;object-fit:cover;border-radius:8px">':"")+'<div style="flex:1"><b>'+esc(p.n)+'</b> <span class="mu">'+esc(p.c)+'</span><input type="number" value="'+p.p+'" onchange="setPrice('+i+',this.value)"></div><button class="chip" onclick="del('+i+')">Suppr.</button></div>').join("")+
  '<button class="btn gold" onclick="pub()" '+(busy?"disabled":"")+'>'+(busy?"Publication…":"5. Publier les changements"+(dirty?" (en attente)":""))+'</button><div class="mu" style="margin-top:6px">Les clients voient les nouveautés seulement après cette étape.</div>'+
- '<h2>Suivi des commandes</h2><div class="card"><div class="mu">Enregistré sur cet appareil seulement.</div><div class="row" style="margin-top:6px"><span>'+orders.length+' commande(s)</span><b>Encaissé : '+fmt(ca)+'</b></div><input id="mc" placeholder="Client"><input id="ma" placeholder="Articles"><input id="mt" type="number" placeholder="Montant (FCFA)"><button class="btn" onclick="addOrder()">Enregistrer une commande</button></div>'+
+ vG()+vMeet()+'<h2>Suivi des commandes</h2><div class="card"><div class="mu">Enregistré sur cet appareil seulement.</div><div class="row" style="margin-top:6px"><span>'+orders.length+' commande(s)</span><b>Encaissé : '+fmt(ca)+'</b></div><input id="mc" placeholder="Client"><input id="ma" placeholder="Articles"><input id="mt" type="number" placeholder="Montant (FCFA)"><button class="btn" onclick="addOrder()">Enregistrer une commande</button></div>'+
  orders.map(o=>'<div class="card"><div class="row"><b>'+esc(o.client)+'</b><span class="mu">'+o.date+'</span></div><div>'+esc(o.articles||"")+'</div><div class="row" style="margin-top:6px"><b>'+fmt(o.total)+'</b><select style="width:auto;margin:0" onchange="updO('+o.id+',{statut:this.value})">'+STAT.map(s=>"<option "+(s===o.statut?"selected":"")+">"+s+"</option>").join("")+'</select><label><input type="checkbox" style="width:auto;margin:0" '+(o.paye?"checked":"")+' onchange="updO('+o.id+',{paye:this.checked})"> Payé</label></div></div>').join("")+
  '<button class="btn" style="background:transparent;color:var(--mu);border:1px solid var(--bd)" onclick="reset()">Changer les réglages de connexion</button>';
 }
